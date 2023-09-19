@@ -1,0 +1,4 @@
+listen: :67
+log:
+  level: debug
+  format: text

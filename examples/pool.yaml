@@ -1,0 +1,15 @@
+apiVersion: dhcp.xfix.org/v1alpha1
+kind: Pool
+metadata:
+  name: vlan-123
+spec:
+  subnet: 10.171.123.0/24
+  range: 10.171.123.45-10.171.123.45
+  routers: 10.171.123.254
+  broadcast: 10.171.123.255
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+  domain: xfix.org
+  lease: xxx
+  filename: http://10.4.122.2/pxe/talos-1.4.3.ipxe
