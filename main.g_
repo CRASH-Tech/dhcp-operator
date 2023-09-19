@@ -1,94 +1,17 @@
 package main
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
-	"flag"
-	"io/ioutil"
 	"net"
-	"os"
 	"time"
 
-	"github.com/CRASH-Tech/dhcp-operator/cmd/common"
-	"github.com/CRASH-Tech/dhcp-operator/cmd/kubernetes"
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/insomniacslk/dhcp/dhcpv4/server4"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
-	"k8s.io/client-go/dynamic"
-	k8s "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
-
-var (
-	version = "0.0.1"
-	config  common.Config
-	kClient *kubernetes.Client
-)
-
-func init() {
-	var configPath string
-	flag.StringVar(&configPath, "c", "config.yaml", "config file path. Default: config.yaml")
-	c, err := readConfig(configPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	config = c
-
-	switch config.Log.Format {
-	case "text":
-		log.SetFormatter(&log.TextFormatter{})
-	case "json":
-		log.SetFormatter(&log.JSONFormatter{})
-	default:
-		log.SetFormatter(&log.TextFormatter{})
-	}
-
-	switch config.Log.Level {
-	case "info":
-		log.SetLevel(log.InfoLevel)
-	case "warn":
-		log.SetLevel(log.WarnLevel)
-	case "debug":
-		log.SetLevel(log.DebugLevel)
-	default:
-		log.SetLevel(log.InfoLevel)
-	}
-
-	var restConfig *rest.Config
-	if path, isSet := os.LookupEnv("KUBECONFIG"); isSet {
-		log.Printf("Using configuration from '%s'", path)
-		restConfig, err = clientcmd.BuildConfigFromFlags("", path)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		log.Info("Using in-cluster configuration")
-		restConfig, err = rest.InClusterConfig()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	config.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
-	config.KubernetesClient = k8s.NewForConfigOrDie(restConfig)
-}
 
 func main() {
-	log.Infof("Starting dhcp-operator %s", version)
-
-	ctx := context.Background()
-	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
-
-	pools, err := kClient.V1alpha1().Pool().GetAll()
-	if err != nil {
-		log.Error(err)
-
-		return
-	}
-	log.Info(pools)
-	//////
 	laddr := &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: 67,
@@ -99,6 +22,7 @@ func main() {
 	}
 
 	server.Serve()
+	//ExampleHandler()
 
 }
 
@@ -182,21 +106,31 @@ func handler(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) {
 	default:
 		log.Info(msg.MessageType())
 	}
-}
 
-func readConfig(path string) (common.Config, error) {
-	config := common.Config{}
+	//log.Println(msg)
 
-	yamlFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		return common.Config{}, err
-	}
-	err = yaml.Unmarshal(yamlFile, &config)
-	if err != nil {
-		return common.Config{}, err
-	}
+	// if msg.MessageType() == dhcpv4.MessageTypeDiscover {
+	// 	tmp.UpdateOption(dhcpv4.OptMessageType(dhcpv4.MessageTypeOffer))
+	// 	tmp.YourIPAddr = net.ParseIP(cIP)
+	// 	tmp.ServerIPAddr = net.ParseIP(sIP)
+	// 	tmp.GatewayIPAddr = net.ParseIP(gIP)
+	// 	tmp.UpdateOption(dhcpv4.OptServerIdentifier(net.ParseIP(sIP)))
+	// 	tmp.UpdateOption(dhcpv4.OptIPAddressLeaseTime(LeaseTime))
+	// 	subnetMask, err := getNetmask("255.255.255.0")
+	// 	if err != nil {
+	// 		log.Fatalln(err)
+	// 	}
 
-	return config, err
+	// 	tmp.UpdateOption(dhcpv4.OptSubnetMask(subnetMask))
+	// 	//dest := &net.UDPAddr{IP: net.IPv4bcast, Port: dhcpv4.ClientPort}
+	// 	dest := &net.UDPAddr{IP: net.ParseIP(gIP), Port: dhcpv4.ClientPort}
+	// 	n, err := conn.WriteTo(tmp.ToBytes(), dest)
+	// 	if err != nil {
+	// 		log.Println(tmp)
+	// 		log.Fatalln("error writing offer response message", err)
+	// 	}
+	// 	log.Println("write offer package successfully: ", n)
+	// }
 }
 
 func checkValidNetmask(netmask net.IPMask) bool {
