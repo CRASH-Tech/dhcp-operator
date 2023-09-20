@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/CRASH-Tech/dhcp-operator/cmd/common"
@@ -31,6 +33,7 @@ var (
 	version = "0.0.1"
 	config  common.Config
 	kClient *kubernetes.Client
+	mutex   sync.Mutex
 )
 
 func init() {
@@ -86,14 +89,16 @@ func main() {
 	ctx := context.Background()
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
 
-	// pools, err := kClient.V1alpha1().Pool().GetAll()
-	// if err != nil {
-	// 	log.Error(err)
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				leaseCleaner()
+			}
+		}
+	}()
 
-	// 	return
-	// }
-	// log.Info(pools)
-	//////
 	laddr := &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: 67,
@@ -108,6 +113,9 @@ func main() {
 }
 
 func handler(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	switch msgType := msg.MessageType(); msgType {
 	case dhcpv4.MessageTypeDiscover:
 		discover(conn, peer, *msg)
@@ -290,6 +298,35 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))
 
 	return reply, nil
+}
+
+func leaseCleaner() {
+	log.Debug("Start lease cleaner")
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	leases, err := kClient.V1alpha1().Lease().GetAll()
+	if err != nil {
+		log.Error(err)
+	}
+
+	for _, lease := range leases {
+		e, err := strconv.ParseInt(lease.Status.Ends, 10, 64)
+		if err != nil {
+			log.Error(err)
+
+			return
+		}
+		ends := time.Unix(e, 0).Add(time.Duration(time.Minute * 5))
+
+		if ends.Before(time.Now()) {
+			log.Debug("Delete expired lease: %s", lease)
+			err := kClient.V1alpha1().Lease().Delete(lease)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	}
 }
 
 func getPool(ip net.IP) (v1alpha1.Pool, error) {

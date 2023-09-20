@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"strconv"
 	"time"
 
@@ -19,6 +20,16 @@ func (Lease *Lease) Create(l v1alpha1.Lease) (v1alpha1.Lease, error) {
 	l.APIVersion = "dhcp.xfix.org/v1alpha1"
 	l.Kind = "Lease"
 	l.Metadata.CreationTimestamp = time.Now().Format("2006-01-02T15:04:05Z")
+
+	ip := net.ParseIP(l.Spec.Ip)
+	if ip == nil {
+		return v1alpha1.Lease{}, errors.New("cannot create lease, nil ip")
+	}
+
+	_, err := net.ParseMAC(l.Spec.Mac)
+	if err != nil {
+		return v1alpha1.Lease{}, errors.New("cannot create lease, wrong mac")
+	}
 
 	if l.Spec.Ip == "0.0.0.0" {
 		return v1alpha1.Lease{}, errors.New("cannot create lease, zero ip")
@@ -95,6 +106,15 @@ func (Lease *Lease) Patch(m v1alpha1.Lease) (v1alpha1.Lease, error) {
 	}
 
 	return result, nil
+}
+
+func (Lease *Lease) Delete(m v1alpha1.Lease) error {
+	err := Lease.client.dynamicDelete(Lease.resourceId, m.Metadata.Name)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (Lease *Lease) UpdateStatus(m v1alpha1.Lease) (v1alpha1.Lease, error) {

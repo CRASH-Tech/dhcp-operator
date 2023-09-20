@@ -63,7 +63,7 @@ func (pool *Pool) GetMask() (net.IPMask, error) {
 }
 
 func (pool *Pool) FindFreeIP(requestedIP net.IP, mac net.HardwareAddr, leases []Lease) (net.IP, error) {
-	if requestedIP.String() != "0.0.0.0" && isIPFree(requestedIP.String(), leases) {
+	if requestedIP != nil && requestedIP.String() != "0.0.0.0" && isIPFree(requestedIP.String(), leases) {
 		return requestedIP, nil
 	}
 
