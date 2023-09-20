@@ -21,6 +21,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+type State struct {
+	Pool   v1alpha1.Pool
+	Lease  v1alpha1.Lease
+	Leases []v1alpha1.Lease
+}
+
 var (
 	version = "0.0.1"
 	config  common.Config
@@ -122,57 +128,49 @@ func handler(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) {
 
 func discover(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 	log.Debug("Received DISCOVER message:\n", msg.Summary())
-	pool, err := getPool(msg.GatewayIPAddr)
+
+	state, err := getState(msg)
 	if err != nil {
 		log.Error(err)
 
 		return
 	}
 
-	leases, err := kClient.V1alpha1().Lease().GetAll()
-	if err != nil {
-		log.Error(err)
-
-		return
-	}
-
-	lease, found, err := pool.FindLease(msg.ClientHWAddr, leases)
-	if err != nil {
-		log.Error(err)
-
-		return
-	}
-
-	if !found {
-		ip, err := pool.FindFreeIP(msg.RequestedIPAddress(), msg.ClientHWAddr, leases)
+	if state.Lease.Metadata.Name == "" {
+		ip, err := state.Pool.FindFreeIP(msg.RequestedIPAddress(), msg.ClientHWAddr, state.Leases)
 		if err != nil {
 			log.Error(err)
 
 			return
 		}
 
-		log.Debugf("Create new lease. IP: %s MAC: %s", ip.String(), msg.ClientHWAddr.String)
-		lease = v1alpha1.Lease{}
-		lease.Metadata.Name = strings.Replace(msg.ClientHWAddr.String(), ":", "-", -1)
-		lease.Spec.Ip = ip.String()
-		lease.Spec.Mac = msg.ClientHWAddr.String()
-		lease.Spec.Hostname = msg.ServerHostName
-		lease.Sttaus.Starts = time.Now().String()
-		//lease.Sttaus.Ends = time.Now().String()
+		log.Debugf("Create new lease. IP: %s MAC: %s", ip.String(), msg.ClientHWAddr.String())
+		state.Lease = v1alpha1.Lease{}
+		state.Lease.Metadata.Name = strings.Replace(msg.ClientHWAddr.String(), ":", "-", -1)
+		state.Lease.Spec.Ip = ip.String()
+		state.Lease.Spec.Mac = msg.ClientHWAddr.String()
+		state.Lease.Spec.Hostname = msg.ServerHostName
 
-		lease, err = kClient.V1alpha1().Lease().Create(lease)
+		lease, err := kClient.V1alpha1().Lease().Create(state.Lease)
 		if err != nil {
 			log.Error(err)
 
 			return
 		}
+
+		lease, err = kClient.V1alpha1().Lease().SetStart(lease)
+		if err != nil {
+			log.Error(err)
+
+			return
+		}
+
+		state.Lease = lease
 	} else {
-		log.Debug("Found existing lease: ", lease)
+		log.Debug("Found existing lease: ", state.Lease)
 	}
 
-	////UPDATE LEASE HERE
-
-	reply, err := makeReply(msg, pool, lease, dhcpv4.MessageTypeOffer)
+	reply, err := makeReply(msg, state, dhcpv4.MessageTypeOffer)
 	if err != nil {
 		log.Error(err)
 
@@ -190,34 +188,34 @@ func discover(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 func request(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 	log.Debug("Received REQUEST message:\n", msg.Summary())
 
-	pool, err := getPool(msg.GatewayIPAddr)
+	state, err := getState(msg)
 	if err != nil {
 		log.Error(err)
 
 		return
 	}
 
-	leases, err := kClient.V1alpha1().Lease().GetAll()
-	if err != nil {
-		log.Error(err)
-
-		return
-	}
-
-	lease, found, err := pool.FindLease(msg.ClientHWAddr, leases)
-	if err != nil {
-		log.Error(err)
-
-		return
-	}
-
-	if !found {
+	if state.Lease.Metadata.Name == "" {
 		log.Debug("Request lease not found:\n", msg.Summary())
 
 		return
 	}
 
-	reply, err := makeReply(msg, pool, lease, dhcpv4.MessageTypeAck)
+	duration, err := time.ParseDuration(state.Pool.Spec.Lease)
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
+	state.Lease, err = kClient.V1alpha1().Lease().Renew(state.Lease, duration)
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
+	reply, err := makeReply(msg, state, dhcpv4.MessageTypeAck)
 	if err != nil {
 		log.Error(err)
 
@@ -244,13 +242,38 @@ func sendReply(conn net.PacketConn, msg *dhcpv4.DHCPv4) error {
 	return nil
 }
 
-func makeReply(msg dhcpv4.DHCPv4, pool v1alpha1.Pool, lease v1alpha1.Lease, msgType dhcpv4.MessageType) (*dhcpv4.DHCPv4, error) {
+func getState(msg dhcpv4.DHCPv4) (State, error) {
+	pool, err := getPool(msg.GatewayIPAddr)
+	if err != nil {
+		return State{}, err
+	}
+
+	leases, err := kClient.V1alpha1().Lease().GetAll()
+	if err != nil {
+		return State{}, err
+	}
+
+	lease, err := pool.FindLease(msg.ClientHWAddr, leases)
+	if err != nil {
+		return State{}, err
+	}
+
+	state := State{
+		Pool:   pool,
+		Lease:  lease,
+		Leases: leases,
+	}
+
+	return state, nil
+}
+
+func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhcpv4.DHCPv4, error) {
 	reply, err := dhcpv4.NewReplyFromRequest(&msg)
 	if err != nil {
 		log.Fatalln("error in constructing offer response message", err)
 	}
 
-	poolMask, err := pool.GetMask()
+	poolMask, err := state.Pool.GetMask()
 	if err != nil {
 		log.Error(err)
 
@@ -258,13 +281,13 @@ func makeReply(msg dhcpv4.DHCPv4, pool v1alpha1.Pool, lease v1alpha1.Lease, msgT
 	}
 
 	reply.UpdateOption(dhcpv4.OptMessageType(msgType))
-	reply.YourIPAddr = net.ParseIP(lease.Spec.Ip)
+	reply.YourIPAddr = net.ParseIP(state.Lease.Spec.Ip)
 	reply.UpdateOption(dhcpv4.OptSubnetMask(poolMask))
-	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(pool.Spec.Routers)))
-	reply.UpdateOption(dhcpv4.OptDNS(pool.GetDNS()...))                ////////////
+	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))
+	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))          ////////////
 	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(time.Second * 60)) /////////////////
-	reply.UpdateOption(dhcpv4.OptHostName(lease.Spec.Hostname))
-	reply.UpdateOption(dhcpv4.OptBootFileName(pool.Spec.Filename))
+	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Spec.Hostname))
+	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))
 
 	return reply, nil
 }
@@ -284,123 +307,3 @@ func getPool(ip net.IP) (v1alpha1.Pool, error) {
 
 	return v1alpha1.Pool{}, fmt.Errorf(fmt.Sprintf("pool not found: %s", ip))
 }
-
-// func getReply(msg *dhcpv4.DHCPv4) (*dhcpv4.DHCPv4, error) {
-// 	pools, err := kClient.V1alpha1().Pool().GetAll()
-// 	if err != nil {
-// 		return msg, err
-// 	}
-
-// 	for _, pool := range pools {
-// 		_, subnet, _ := net.ParseCIDR(pool.Spec.Subnet)
-// 		if subnet.Contains(msg.GatewayIPAddr) {
-// 			log.Debug("Found pool: ", pool)
-// 			lease, err := findLease(msg)
-// 			if err != nil {
-// 				return msg, err
-// 			}
-
-// 			_, poolIPNet, err := net.ParseCIDR(pool.Spec.Subnet)
-// 			if err != nil {
-// 				return msg, err
-// 			}
-
-// 			msg.UpdateOption(dhcpv4.OptSubnetMask(poolIPNet.Mask))
-// 			msg.UpdateOption(dhcpv4.OptRouter(net.IP(pool.Spec.Routers)))
-// 			msg.UpdateOption(dhcpv4.OptDNS(net.IP("8.8.8.8")))               ////////////
-// 			msg.UpdateOption(dhcpv4.OptIPAddressLeaseTime(time.Second * 60)) /////////////////
-// 			msg.UpdateOption(dhcpv4.OptBootFileName(pool.Spec.Filename))
-
-// 			///
-// 			if msg.RequestedIPAddress().String()
-
-// 			if lease.Spec.Ip != "" {
-// 				log.Debug("Found existing lease: ", lease)
-// 				msg.YourIPAddr = net.IP(lease.Spec.Ip)
-
-// 				return msg, nil
-// 			} else {
-// 				ip, err := findFreeIP(msg, pool)
-// 				if err != nil {
-// 					return msg, err
-// 				}
-
-// 				msg.YourIPAddr = ip
-
-// 				return msg, nil
-// 			}
-// 		}
-
-// 	}
-
-// 	return msg, errors.New("cannot get reply")
-// }
-
-// func findLease(msg *dhcpv4.DHCPv4) (v1alpha1.Lease, error) {
-// 	leases, err := kClient.V1alpha1().Lease().GetAll()
-// 	if err != nil {
-// 		return v1alpha1.Lease{}, err
-// 	}
-
-// 	for _, lease := range leases {
-// 		if msg.ClientHWAddr.String() == lease.Spec.Mac {
-// 			log.Debug("Found lease: ", lease)
-
-// 			return lease, nil
-// 		}
-// 	}
-
-// 	return v1alpha1.Lease{}, nil
-// }
-
-// func findFreeIP(msg *dhcpv4.DHCPv4, pool v1alpha1.Pool) (net.IP, error) {
-// 	leases, err := kClient.V1alpha1().Lease().GetAll()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	for _, lease := range leases {
-
-// 	}
-// }
-
-// func isIpUsed(ip net.IP) (bool, error) {
-// 	leases, err := kClient.V1alpha1().Lease().GetAll()
-// 	if err != nil {
-// 		return true, err
-// 	}
-
-// 	for _, lease := range leases {
-// 		if lease.Spec.Ip == ip.String() {
-// 			log.Debug("IP is already used: ", ip, lease)
-// 			return true, nil
-// 		}
-// 	}
-
-// 	return false, nil
-// }
-
-// func checkValidNetmask(netmask net.IPMask) bool {
-// 	netmaskInt := binary.BigEndian.Uint32(netmask)
-// 	x := ^netmaskInt
-// 	y := x + 1
-// 	return (y & x) == 0
-// }
-
-// func getNetmask(ipMask string) (net.IPMask, error) {
-// 	netmaskIP := net.ParseIP(ipMask)
-// 	if netmaskIP.IsUnspecified() {
-// 		return nil, errors.New("invalid subnet mask")
-// 	}
-
-// 	netmaskIP = netmaskIP.To4()
-// 	if netmaskIP == nil {
-// 		return nil, errors.New("error converting subnet mask to IPv4 format")
-// 	}
-
-// 	netmask := net.IPv4Mask(netmaskIP[0], netmaskIP[1], netmaskIP[2], netmaskIP[3])
-// 	if !checkValidNetmask(netmask) {
-// 		return nil, errors.New("illegal subnet mask")
-// 	}
-// 	return netmask, nil
-// }

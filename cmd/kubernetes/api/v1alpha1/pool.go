@@ -30,14 +30,14 @@ type PoolSpec struct {
 	Filename  string   `json:"filename"`
 }
 
-func (pool *Pool) FindLease(mac net.HardwareAddr, leases []Lease) (Lease, bool, error) {
+func (pool *Pool) FindLease(mac net.HardwareAddr, leases []Lease) (Lease, error) {
 	for _, lease := range leases {
 		if mac.String() == lease.Spec.Mac {
-			return lease, true, nil
+			return lease, nil
 		}
 	}
 
-	return Lease{}, false, nil
+	return Lease{}, nil
 }
 
 func (pool *Pool) GetDNS() []net.IP {
@@ -63,7 +63,7 @@ func (pool *Pool) GetMask() (net.IPMask, error) {
 }
 
 func (pool *Pool) FindFreeIP(requestedIP net.IP, mac net.HardwareAddr, leases []Lease) (net.IP, error) {
-	if isIPFree(requestedIP.String(), leases) {
+	if requestedIP.String() != "0.0.0.0" && isIPFree(requestedIP.String(), leases) {
 		return requestedIP, nil
 	}
 

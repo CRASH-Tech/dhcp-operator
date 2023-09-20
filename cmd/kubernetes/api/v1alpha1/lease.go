@@ -7,7 +7,7 @@ type Lease struct {
 	Kind       string                     `json:"kind"`
 	Metadata   api.CustomResourceMetadata `json:"metadata"`
 	Spec       LeaseSpec                  `json:"spec"`
-	Sttaus     LeaseStatus                `json:"status"`
+	Status     LeaseStatus                `json:"status"`
 }
 
 type LeaseSpec struct {
