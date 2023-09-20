@@ -13,12 +13,12 @@ type Pool struct {
 	resourceId schema.GroupVersionResource
 }
 
-func (Pool *Pool) Create(m v1alpha1.Pool) (v1alpha1.Pool, error) {
-	m.APIVersion = "dhcp.xfix.org/v1alpha1"
-	m.Kind = "Pool"
-	m.Metadata.CreationTimestamp = time.Now().Format("2006-01-02T15:04:05Z")
+func (Pool *Pool) Create(p v1alpha1.Pool) (v1alpha1.Pool, error) {
+	p.APIVersion = "dhcp.xfix.org/v1alpha1"
+	p.Kind = "Pool"
+	p.Metadata.CreationTimestamp = time.Now().Format("2006-01-02T15:04:05Z")
 
-	item, err := Pool.client.dynamicCreate(Pool.resourceId, &m)
+	item, err := Pool.client.dynamicCreate(Pool.resourceId, &p)
 	if err != nil {
 		return v1alpha1.Pool{}, err
 	}

@@ -30,15 +30,36 @@ type PoolSpec struct {
 	Filename  string   `json:"filename"`
 }
 
-func (pool *Pool) FindLease(requestedIP net.IP, mac net.HardwareAddr, leases []Lease) (Lease, bool, error) {
+func (pool *Pool) FindLease(mac net.HardwareAddr, leases []Lease) (Lease, bool, error) {
 	for _, lease := range leases {
-		if requestedIP.String() == lease.Spec.Ip && mac.String() == lease.Spec.Mac {
-			log.Error(".................................")
+		if mac.String() == lease.Spec.Mac {
 			return lease, true, nil
 		}
 	}
 
 	return Lease{}, false, nil
+}
+
+func (pool *Pool) GetDNS() []net.IP {
+	var result []net.IP
+
+	for _, srv := range pool.Spec.Dns {
+		result = append(result, net.ParseIP(srv))
+
+	}
+
+	return result
+}
+
+func (pool *Pool) GetMask() (net.IPMask, error) {
+	_, poolIPNet, err := net.ParseCIDR(pool.Spec.Subnet)
+	if err != nil {
+		log.Error(err)
+
+		return net.IPMask{}, err
+	}
+
+	return poolIPNet.Mask, nil
 }
 
 func (pool *Pool) FindFreeIP(requestedIP net.IP, mac net.HardwareAddr, leases []Lease) (net.IP, error) {
@@ -53,7 +74,7 @@ func (pool *Pool) FindFreeIP(requestedIP net.IP, mac net.HardwareAddr, leases []
 					continue
 				}
 			}
-
+			fmt.Println("FOUND:", ip)
 			return net.ParseIP(ip), nil
 		}
 	}

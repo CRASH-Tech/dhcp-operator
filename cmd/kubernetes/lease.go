@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/CRASH-Tech/dhcp-operator/cmd/kubernetes/api/v1alpha1"
@@ -13,12 +14,16 @@ type Lease struct {
 	resourceId schema.GroupVersionResource
 }
 
-func (Lease *Lease) Create(m v1alpha1.Lease) (v1alpha1.Lease, error) {
-	m.APIVersion = "dhcp.xfix.org/v1alpha1"
-	m.Kind = "Lease"
-	m.Metadata.CreationTimestamp = time.Now().Format("2006-01-02T15:04:05Z")
+func (Lease *Lease) Create(l v1alpha1.Lease) (v1alpha1.Lease, error) {
+	l.APIVersion = "dhcp.xfix.org/v1alpha1"
+	l.Kind = "Lease"
+	l.Metadata.CreationTimestamp = time.Now().Format("2006-01-02T15:04:05Z")
 
-	item, err := Lease.client.dynamicCreate(Lease.resourceId, &m)
+	if l.Spec.Ip == "" || l.Spec.Mac == "" {
+		return v1alpha1.Lease{}, errors.New("cannot create lease, empty data!")
+	}
+
+	item, err := Lease.client.dynamicCreate(Lease.resourceId, &l)
 	if err != nil {
 		return v1alpha1.Lease{}, err
 	}
