@@ -32,12 +32,15 @@ spec:
               type: object
               required:
                 - subnet
-                - range
+                - start
+                - end
                 - lease
               properties:
                 subnet:
                   type: string
-                range:
+                start:
+                  type: string
+                end:
                   type: string
                 routers:
                   type: string
@@ -59,8 +62,11 @@ spec:
         - name: subnet
           type: string
           jsonPath: .spec.subnet
-        - name: range
+        - name: start
           type: string
-          jsonPath: .spec.range
+          jsonPath: .spec.start
+        - name: end
+          type: string
+          jsonPath: .spec.end
   conversion:
     strategy: None

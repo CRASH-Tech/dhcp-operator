@@ -4,7 +4,8 @@ metadata:
   name: vlan-123
 spec:
   subnet: 10.171.123.0/24
-  range: 10.171.123.45-10.171.123.45
+  start: 10.171.123.100
+  end: 10.171.123.150
   routers: 10.171.123.254
   broadcast: 10.171.123.255
   dns:
