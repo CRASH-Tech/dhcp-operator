@@ -304,21 +304,19 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 
 	reply.UpdateOption(dhcpv4.OptMessageType(msgType))
 	reply.YourIPAddr = net.ParseIP(state.Lease.Spec.Ip)
+	reply.UpdateOption(dhcpv4.OptServerIdentifier(msg.GatewayIPAddr))
 	reply.UpdateOption(dhcpv4.OptRequestedIPAddress(net.ParseIP(state.Lease.Spec.Ip)))
 	reply.UpdateOption(dhcpv4.OptSubnetMask(poolMask))
 	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))
 	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))
 	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(duration))
-	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Status.Hostname)) ///////////////
+	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Status.Hostname))
 	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))
 
 	return reply, nil
 }
 
 func sendReply(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) error {
-	//log.Error(peer)
-	//lol := net.UDPAddr{}
-
 	ipPort := strings.Split(peer.String(), ":")
 	destIP := net.ParseIP(ipPort[0])
 	destPort, err := strconv.Atoi(ipPort[1])
