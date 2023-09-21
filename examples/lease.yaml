@@ -1,0 +1,12 @@
+apiVersion: dhcp.xfix.org/v1alpha1
+kind: Lease
+metadata:
+  name: da-49-d9-d0-7a-c1
+spec:
+  ip: 10.171.123.120
+  mac: da:49:d9:d0:7a:c1
+  static: true
+status:
+  hostname: "test"
+  ends: "1695279405"
+  starts: "1695279102"

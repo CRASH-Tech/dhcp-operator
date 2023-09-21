@@ -38,11 +38,13 @@ spec:
                   type: string
                 mac:
                   type: string
-                hostname:
-                  type: string
+                static:
+                  type: boolean
             status:
               type: object
               properties:
+                hostname:
+                  type: string
                 starts:
                   type: string
                 ends:
@@ -56,9 +58,12 @@ spec:
         - name: mac
           type: string
           jsonPath: .spec.mac
+        - name: static
+          type: boolean
+          jsonPath: .spec.static
         - name: hostname
           type: string
-          jsonPath: .spec.hostname
+          jsonPath: .status.hostname
         - name: starts
           type: string
           jsonPath: .status.starts

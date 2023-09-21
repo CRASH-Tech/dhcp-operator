@@ -157,7 +157,7 @@ func discover(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 		state.Lease.Metadata.Name = strings.Replace(msg.ClientHWAddr.String(), ":", "-", -1)
 		state.Lease.Spec.Ip = ip.String()
 		state.Lease.Spec.Mac = msg.ClientHWAddr.String()
-		state.Lease.Spec.Hostname = msg.ServerHostName
+		state.Lease.Spec.Static = false
 
 		lease, err := kClient.V1alpha1().Lease().Create(state.Lease)
 		if err != nil {
@@ -185,7 +185,7 @@ func discover(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 		return
 	}
 
-	err = sendReply(conn, reply)
+	err = sendReply(conn, peer, reply)
 	if err != nil {
 		log.Error(err)
 
@@ -223,6 +223,14 @@ func request(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 		return
 	}
 
+	state.Lease.Status.Hostname = string(msg.Options.Get(dhcpv4.OptionHostName))
+	state.Lease, err = kClient.V1alpha1().Lease().UpdateStatus(state.Lease)
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
 	reply, err := makeReply(msg, state, dhcpv4.MessageTypeAck)
 	if err != nil {
 		log.Error(err)
@@ -230,7 +238,7 @@ func request(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 		return
 	}
 
-	err = sendReply(conn, reply)
+	err = sendReply(conn, peer, reply)
 	if err != nil {
 		log.Error(err)
 
@@ -277,43 +285,6 @@ func release(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 
 }
 
-func sendReply(conn net.PacketConn, msg *dhcpv4.DHCPv4) error {
-	dest := &net.UDPAddr{IP: msg.GatewayIPAddr, Port: 67}
-	_, err := conn.WriteTo(msg.ToBytes(), dest)
-	if err != nil {
-		return err
-	}
-
-	log.Debug("Reply message:\n", msg.Summary())
-
-	return nil
-}
-
-func getState(msg dhcpv4.DHCPv4) (State, error) {
-	pool, err := getPool(msg.GatewayIPAddr)
-	if err != nil {
-		return State{}, err
-	}
-
-	leases, err := kClient.V1alpha1().Lease().GetAll()
-	if err != nil {
-		return State{}, err
-	}
-
-	lease, err := pool.FindLease(msg.ClientHWAddr, leases)
-	if err != nil {
-		return State{}, err
-	}
-
-	state := State{
-		Pool:   pool,
-		Lease:  lease,
-		Leases: leases,
-	}
-
-	return state, nil
-}
-
 func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhcpv4.DHCPv4, error) {
 	reply, err := dhcpv4.NewReplyFromRequest(&msg)
 	if err != nil {
@@ -340,10 +311,33 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))
 	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))
 	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(duration))
-	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Spec.Hostname))
+	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Status.Hostname))
 	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))
 
 	return reply, nil
+}
+
+func sendReply(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) error {
+	//log.Error(peer)
+	//lol := net.UDPAddr{}
+
+	ipPort := strings.Split(peer.String(), ":")
+	destIP := net.ParseIP(ipPort[0])
+	destPort, err := strconv.Atoi(ipPort[1])
+	if err != nil {
+		return err
+	}
+
+	dest := &net.UDPAddr{IP: destIP, Port: destPort}
+	//dest := &net.UDPAddr{IP: msg.GatewayIPAddr, Port: 67}
+	_, err = conn.WriteTo(msg.ToBytes(), dest)
+	if err != nil {
+		return err
+	}
+
+	log.Debug("Reply message:\n", msg.Summary())
+
+	return nil
 }
 
 func leaseCleaner() {
@@ -357,11 +351,17 @@ func leaseCleaner() {
 	}
 
 	for _, lease := range leases {
+		if lease.Spec.Static {
+			log.Debugf("Skip delete static lease: %s", lease)
+
+			continue
+		}
+
 		e, err := strconv.ParseInt(lease.Status.Ends, 10, 64)
 		if err != nil {
 			log.Error(err)
 
-			return
+			continue
 		}
 		ends := time.Unix(e, 0).Add(time.Duration(time.Minute * 5))
 
@@ -373,6 +373,31 @@ func leaseCleaner() {
 			}
 		}
 	}
+}
+
+func getState(msg dhcpv4.DHCPv4) (State, error) {
+	pool, err := getPool(msg.GatewayIPAddr)
+	if err != nil {
+		return State{}, err
+	}
+
+	leases, err := kClient.V1alpha1().Lease().GetAll()
+	if err != nil {
+		return State{}, err
+	}
+
+	lease, err := pool.FindLease(msg.ClientHWAddr, leases)
+	if err != nil {
+		return State{}, err
+	}
+
+	state := State{
+		Pool:   pool,
+		Lease:  lease,
+		Leases: leases,
+	}
+
+	return state, nil
 }
 
 func getPool(ip net.IP) (v1alpha1.Pool, error) {

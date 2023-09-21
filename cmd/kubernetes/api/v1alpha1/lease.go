@@ -11,12 +11,13 @@ type Lease struct {
 }
 
 type LeaseSpec struct {
-	Ip       string `json:"ip"`
-	Mac      string `json:"mac"`
-	Hostname string `json:"hostname"`
+	Ip     string `json:"ip"`
+	Mac    string `json:"mac"`
+	Static bool   `json:"static"`
 }
 
 type LeaseStatus struct {
-	Starts string `json:"starts"`
-	Ends   string `json:"ends"`
+	Hostname string `json:"hostname"`
+	Starts   string `json:"starts"`
+	Ends     string `json:"ends"`
 }
