@@ -6,6 +6,6 @@ spec:
   data: |
     #!ipxe
 
-    kernel http://10.171.120.1:9999/static/talos-1.5.2-vmlinuz-amd64 slab_nomerge pti=on talos.platform=metal talos.config=http://10.171.120.1:8888/register?role=worker&token=welcome123
+    kernel http://10.171.120.1:9999/static/talos-1.5.2-vmlinuz-amd64 slab_nomerge pti=on talos.platform=metal talos.config=http://10.171.120.1:8888/register?uuid=${uuid}&hostname=${hostname}&mac=${mac}&serial=${serial}&role=worker&token=welcome123
     initrd http://10.171.120.1:9999/static/talos-1.5.2-initramfs-amd64.xz
     boot
