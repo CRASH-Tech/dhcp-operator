@@ -137,30 +137,13 @@ func (Lease *Lease) UpdateStatus(m v1alpha1.Lease) (v1alpha1.Lease, error) {
 	return result, nil
 }
 
-func (Lease *Lease) SetStart(m v1alpha1.Lease) (v1alpha1.Lease, error) {
-	m.Status.Starts = strconv.FormatInt(time.Now().Unix(), 10)
-
-	jsonData, err := json.Marshal(m)
-	if err != nil {
-		return v1alpha1.Lease{}, err
-	}
-
-	resp, err := Lease.client.dynamicUpdateStatus(Lease.resourceId, m.Metadata.Name, jsonData)
-	if err != nil {
-		return v1alpha1.Lease{}, err
-	}
-
-	var result v1alpha1.Lease
-	err = json.Unmarshal(resp, &result)
-	if err != nil {
-		return v1alpha1.Lease{}, err
-	}
-
-	return result, nil
-}
-
-func (Lease *Lease) Renew(m v1alpha1.Lease, duration time.Duration) (v1alpha1.Lease, error) {
+func (Lease *Lease) Renew(m v1alpha1.Lease, hostname string, duration time.Duration) (v1alpha1.Lease, error) {
+	m.Status.Hostname = hostname
 	m.Status.Ends = strconv.FormatInt(time.Now().Add(duration).Unix(), 10)
+
+	if m.Status.Starts == "" {
+		m.Status.Starts = strconv.FormatInt(time.Now().Unix(), 10)
+	}
 
 	jsonData, err := json.Marshal(m)
 	if err != nil {

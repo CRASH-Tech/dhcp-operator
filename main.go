@@ -159,21 +159,26 @@ func discover(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 		state.Lease.Spec.Mac = msg.ClientHWAddr.String()
 		state.Lease.Spec.Static = false
 
-		lease, err := kClient.V1alpha1().Lease().Create(state.Lease)
+		state.Lease, err = kClient.V1alpha1().Lease().Create(state.Lease)
 		if err != nil {
 			log.Error(err)
 
 			return
 		}
 
-		lease, err = kClient.V1alpha1().Lease().SetStart(lease)
+		duration, err := time.ParseDuration(state.Pool.Spec.Lease)
 		if err != nil {
 			log.Error(err)
 
 			return
 		}
 
-		state.Lease = lease
+		state.Lease, err = kClient.V1alpha1().Lease().Renew(state.Lease, string(msg.Options.Get(dhcpv4.OptionHostName)), duration)
+		if err != nil {
+			log.Error(err)
+
+			return
+		}
 	} else {
 		log.Debug("Found existing lease: ", state.Lease)
 	}
@@ -216,15 +221,7 @@ func request(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 		return
 	}
 
-	state.Lease, err = kClient.V1alpha1().Lease().Renew(state.Lease, duration)
-	if err != nil {
-		log.Error(err)
-
-		return
-	}
-
-	state.Lease.Status.Hostname = string(msg.Options.Get(dhcpv4.OptionHostName))
-	state.Lease, err = kClient.V1alpha1().Lease().UpdateStatus(state.Lease)
+	state.Lease, err = kClient.V1alpha1().Lease().Renew(state.Lease, string(msg.Options.Get(dhcpv4.OptionHostName)), duration)
 	if err != nil {
 		log.Error(err)
 
@@ -307,11 +304,12 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 
 	reply.UpdateOption(dhcpv4.OptMessageType(msgType))
 	reply.YourIPAddr = net.ParseIP(state.Lease.Spec.Ip)
+	reply.UpdateOption(dhcpv4.OptRequestedIPAddress(net.ParseIP(state.Lease.Spec.Ip)))
 	reply.UpdateOption(dhcpv4.OptSubnetMask(poolMask))
 	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))
 	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))
 	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(duration))
-	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Status.Hostname))
+	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Status.Hostname)) ///////////////
 	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))
 
 	return reply, nil
