@@ -6,7 +6,8 @@ import (
 )
 
 type Config struct {
-	Listen           string    `yaml:"listen"`
+	DhcpPort         int       `yaml:"dhcpPort"`
+	PxePort          int       `yaml:"pxePort"`
 	Log              LogConfig `yaml:"log"`
 	DynamicClient    *dynamic.DynamicClient
 	KubernetesClient *kubernetes.Clientset

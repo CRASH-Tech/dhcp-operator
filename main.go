@@ -99,10 +99,13 @@ func main() {
 		}
 	}()
 
+	listenPXE()
+
 	laddr := &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
-		Port: 67,
+		Port: config.DhcpPort,
 	}
+
 	server, err := server4.NewServer("", laddr, handler)
 	if err != nil {
 		log.Fatal(err)
@@ -304,7 +307,7 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 
 	reply.UpdateOption(dhcpv4.OptMessageType(msgType))
 	reply.YourIPAddr = net.ParseIP(state.Lease.Spec.Ip)
-	reply.UpdateOption(dhcpv4.OptServerIdentifier(msg.GatewayIPAddr))
+	reply.UpdateOption(dhcpv4.OptServerIdentifier(msg.GatewayIPAddr)) //////////////////////////////////////////////////////////////////////////////////TODO: LOL
 	reply.UpdateOption(dhcpv4.OptRequestedIPAddress(net.ParseIP(state.Lease.Spec.Ip)))
 	reply.UpdateOption(dhcpv4.OptSubnetMask(poolMask))
 	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))

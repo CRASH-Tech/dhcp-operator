@@ -13,4 +13,4 @@ spec:
     - 8.8.4.4
   domain: xfix.org
   lease: 1h
-  filename: http://10.4.122.2/pxe/talos-1.4.3.ipxe
+  filename: http://10.171.120.1:9999/pxe/k-test-worker

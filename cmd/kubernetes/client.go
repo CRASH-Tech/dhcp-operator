@@ -167,3 +167,16 @@ func (v1alpha1 *V1alpha1) Lease() *Lease {
 
 	return &lease
 }
+
+func (v1alpha1 *V1alpha1) PXE() *PXE {
+	pxe := PXE{
+		client: v1alpha1.client,
+		resourceId: schema.GroupVersionResource{
+			Group:    "dhcp.xfix.org",
+			Version:  "v1alpha1",
+			Resource: "pxe",
+		},
+	}
+
+	return &pxe
+}
