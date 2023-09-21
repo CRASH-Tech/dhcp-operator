@@ -69,13 +69,10 @@ func (pool *Pool) FindFreeIP(requestedIP net.IP, mac net.HardwareAddr, leases []
 
 	for _, ip := range cidrHosts(pool.Spec.Subnet) {
 		if isIpInRange(net.ParseIP(pool.Spec.Start), net.ParseIP(pool.Spec.End), net.ParseIP(ip)) {
-			for _, lease := range leases {
-				if lease.Spec.Ip == ip {
-					continue
-				}
+			if isIPFree(ip, leases) {
+				return net.ParseIP(ip), nil
 			}
-			fmt.Println("FOUND:", ip)
-			return net.ParseIP(ip), nil
+
 		}
 	}
 

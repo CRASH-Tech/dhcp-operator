@@ -89,7 +89,7 @@ func main() {
 	ctx := context.Background()
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		for {
 			select {
@@ -127,7 +127,7 @@ func handler(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) {
 		log.Info("INFORM")
 
 	case dhcpv4.MessageTypeRelease:
-		log.Info("RELEASE")
+		release(conn, peer, *msg)
 
 	default:
 		log.Info(msg.MessageType())
@@ -238,6 +238,45 @@ func request(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
 	}
 }
 
+func release(conn net.PacketConn, peer net.Addr, msg dhcpv4.DHCPv4) {
+	log.Debug("Received RELEASE message:\n", msg.Summary())
+
+	pool, err := getPool(msg.GatewayIPAddr)
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
+	leases, err := kClient.V1alpha1().Lease().GetAll()
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
+	lease, err := pool.FindLease(msg.ClientHWAddr, leases)
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
+	if lease.Metadata.Name != "" {
+		err := kClient.V1alpha1().Lease().Delete(lease)
+		if err != nil {
+			log.Error(err)
+
+			return
+		}
+	} else {
+		log.Errorf("cannot release lease, lease not found: %s", lease)
+
+		return
+	}
+
+}
+
 func sendReply(conn net.PacketConn, msg *dhcpv4.DHCPv4) error {
 	dest := &net.UDPAddr{IP: msg.GatewayIPAddr, Port: 67}
 	_, err := conn.WriteTo(msg.ToBytes(), dest)
@@ -288,12 +327,19 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 		return reply, err
 	}
 
+	duration, err := time.ParseDuration(state.Pool.Spec.Lease)
+	if err != nil {
+		log.Error(err)
+
+		return reply, err
+	}
+
 	reply.UpdateOption(dhcpv4.OptMessageType(msgType))
 	reply.YourIPAddr = net.ParseIP(state.Lease.Spec.Ip)
 	reply.UpdateOption(dhcpv4.OptSubnetMask(poolMask))
 	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))
-	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))          ////////////
-	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(time.Second * 60)) /////////////////
+	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))
+	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(duration))
 	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Spec.Hostname))
 	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))
 
@@ -301,7 +347,7 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 }
 
 func leaseCleaner() {
-	log.Debug("Start lease cleaner")
+	log.Debug("Start lease cleaner...")
 	mutex.Lock()
 	defer mutex.Unlock()
 
