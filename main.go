@@ -312,6 +312,7 @@ func makeReply(msg dhcpv4.DHCPv4, state State, msgType dhcpv4.MessageType) (*dhc
 	reply.UpdateOption(dhcpv4.OptSubnetMask(poolMask))
 	reply.UpdateOption(dhcpv4.OptRouter(net.ParseIP(state.Pool.Spec.Routers)))
 	reply.UpdateOption(dhcpv4.OptDNS(state.Pool.GetDNS()...))
+	reply.UpdateOption(dhcpv4.OptNTPServers(state.Pool.GetNTP()...))
 	reply.UpdateOption(dhcpv4.OptIPAddressLeaseTime(duration))
 	reply.UpdateOption(dhcpv4.OptHostName(state.Lease.Status.Hostname))
 	reply.UpdateOption(dhcpv4.OptBootFileName(state.Pool.Spec.Filename))

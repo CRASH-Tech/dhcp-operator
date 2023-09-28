@@ -25,6 +25,7 @@ type PoolSpec struct {
 	Routers   string   `json:"routers"`
 	Broadcast string   `json:"broadcast"`
 	Dns       []string `json:"dns"`
+	Ntp       []string `json:"ntp"`
 	Domain    string   `json:"domain"`
 	Lease     string   `json:"lease"`
 	Filename  string   `json:"filename"`
@@ -44,6 +45,17 @@ func (pool *Pool) GetDNS() []net.IP {
 	var result []net.IP
 
 	for _, srv := range pool.Spec.Dns {
+		result = append(result, net.ParseIP(srv))
+
+	}
+
+	return result
+}
+
+func (pool *Pool) GetNTP() []net.IP {
+	var result []net.IP
+
+	for _, srv := range pool.Spec.Ntp {
 		result = append(result, net.ParseIP(srv))
 
 	}

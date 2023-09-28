@@ -11,6 +11,9 @@ spec:
   dns:
     - 8.8.8.8
     - 8.8.4.4
+  ntp:
+    - 88.147.254.227
+    - 88.147.254.235
   domain: xfix.org
   lease: 1h
   filename: http://10.171.120.1:9999/pxe/k-test-worker

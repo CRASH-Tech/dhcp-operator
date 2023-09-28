@@ -50,6 +50,10 @@ spec:
                   type: array
                   items:
                     type: string
+                ntp:
+                  type: array
+                  items:
+                    type: string
                 domain:
                   type: string
                 lease:
