@@ -148,7 +148,8 @@ func metrics() {
 			return
 		}
 
-		leaseExpiration.WithLabelValues(lease.Spec.Ip,
+		leaseExpiration.WithLabelValues(
+			lease.Spec.Ip,
 			lease.Spec.Mac,
 			lease.Spec.Pool,
 			lease.Status.Hostname,
