@@ -33,6 +33,7 @@ spec:
               required:
                 - ip
                 - mac
+                - pool
               properties:
                 ip:
                   type: string
@@ -40,6 +41,8 @@ spec:
                   type: string
                 static:
                   type: boolean
+                pool:
+                  type: string
             status:
               type: object
               properties:

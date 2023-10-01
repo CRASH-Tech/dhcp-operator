@@ -14,6 +14,7 @@ type LeaseSpec struct {
 	Ip     string `json:"ip"`
 	Mac    string `json:"mac"`
 	Static bool   `json:"static"`
+	Pool   string `json:"pool"`
 }
 
 type LeaseStatus struct {

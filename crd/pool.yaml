@@ -36,6 +36,11 @@ spec:
                 - end
                 - lease
               properties:
+                priority:
+                  type: integer
+                  default: 0
+                  minimum: 0
+                  maximum: 10
                 subnet:
                   type: string
                 start:
