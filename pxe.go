@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -12,6 +13,7 @@ func listenPXE() {
 	go func() {
 		fs := http.FileServer(http.Dir("./static/"))
 
+		http.Handle("/metrics", promhttp.Handler())
 		http.HandleFunc("/pxe/", pxeHandler)
 		http.Handle("/static/", http.StripPrefix("/static/", fs))
 		err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", config.PxePort), nil)

@@ -17,6 +17,7 @@ import (
 	"github.com/CRASH-Tech/dhcp-operator/cmd/kubernetes/api/v1alpha1"
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/insomniacslk/dhcp/dhcpv4/server4"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/dynamic"
 	k8s "k8s.io/client-go/kubernetes"
@@ -35,6 +36,25 @@ var (
 	config  common.Config
 	kClient *kubernetes.Client
 	mutex   sync.Mutex
+
+	// leaseExpiration = promauto.NewCounter(prometheus.CounterOpts{
+	// 	Name: "lease_expiration",
+	// 	Help: "The time of lease expiration",
+	// })
+
+	// leaseExpiration2 = promauto.NewCounter(prometheus.Counter)
+	leaseExpiration = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "lease_expiration",
+			Help: "The time to lease expiration",
+		},
+		[]string{
+			"ip",
+			"mac",
+			"pool",
+			"hostname",
+		},
+	)
 )
 
 func init() {
@@ -82,6 +102,8 @@ func init() {
 	}
 	config.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 	config.KubernetesClient = k8s.NewForConfigOrDie(restConfig)
+
+	prometheus.MustRegister(leaseExpiration)
 }
 
 func main() {
@@ -90,11 +112,12 @@ func main() {
 	ctx := context.Background()
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
 
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
+				metrics()
 				leaseCleaner()
 			}
 		}
@@ -113,6 +136,30 @@ func main() {
 	}
 
 	server.Serve()
+}
+
+func metrics() {
+	leases, err := kClient.V1alpha1().Lease().GetAll()
+	if err != nil {
+		log.Error(err)
+
+		return
+	}
+
+	for _, lease := range leases {
+		ends, err := strconv.ParseInt(lease.Status.Ends, 10, 64)
+		if err != nil {
+			log.Error(err)
+
+			return
+		}
+
+		leaseExpiration.WithLabelValues(lease.Spec.Ip,
+			lease.Spec.Mac,
+			lease.Spec.Pool,
+			lease.Status.Hostname,
+		).Set(float64(ends - time.Now().Unix()))
+	}
 }
 
 func handler(conn net.PacketConn, peer net.Addr, msg *dhcpv4.DHCPv4) {
