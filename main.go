@@ -37,12 +37,6 @@ var (
 	kClient *kubernetes.Client
 	mutex   sync.Mutex
 
-	// leaseExpiration = promauto.NewCounter(prometheus.CounterOpts{
-	// 	Name: "lease_expiration",
-	// 	Help: "The time of lease expiration",
-	// })
-
-	// leaseExpiration2 = promauto.NewCounter(prometheus.Counter)
 	leaseExpiration = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "lease_expiration",
