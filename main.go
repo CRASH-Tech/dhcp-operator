@@ -441,63 +441,6 @@ func getLease(msg dhcpv4.DHCPv4) (v1alpha1.Lease, bool, error) {
 	return v1alpha1.Lease{}, false, err
 }
 
-// func makeLease(msg dhcpv4.DHCPv4) (v1alpha1.Lease, error) {
-// 	var rIP net.IP
-// 	var requested bool
-// 	if msg.RequestedIPAddress() != nil && msg.RequestedIPAddress().String() != "0.0.0.0" {
-// 		log.Debugf("New lease from requested IP: %s", msg.RequestedIPAddress().String())
-// 		rIP = msg.RequestedIPAddress()
-// 		requested = true
-// 	} else {
-// 		rIP = msg.GatewayIPAddr
-// 		requested = false
-// 	}
-
-// 	pools, err := getAvialablePools(rIP, requested)
-// 	if err != nil {
-// 		log.Error(err)
-
-// 		return
-// 	}
-
-// 	sort.Slice(pools[:], func(i, j int) bool {
-// 		return pools[i].Spec.Priority < pools[j].Spec.Priority
-// 	})
-
-// 	for _, pool := range pools {
-// 		ips, err := getAvialableIPs(pool, rIP, requested)
-// 		if err != nil {
-// 			log.Error(err)
-
-// 			return
-// 		}
-
-// 		if len(ips) > 0 {
-// 			lease, err := newLease(ips[0], pool, msg)
-// 			if err != nil {
-// 				log.Error(err)
-
-// 				return
-// 			}
-// 			reply, err := makeReply(msg, lease, dhcpv4.MessageTypeAck)
-// 			if err != nil {
-// 				log.Error(err)
-
-// 				return
-// 			}
-
-// 			err = sendReply(conn, peer, reply)
-// 			if err != nil {
-// 				log.Error(err)
-
-// 				return
-// 			}
-
-// 			return
-// 		}
-// 	}
-// }
-
 func newLease(ip net.IP, pool v1alpha1.Pool, msg dhcpv4.DHCPv4) (v1alpha1.Lease, error) {
 	log.Debugf("Create new lease. IP: %s MAC: %s", ip.String(), msg.ClientHWAddr.String())
 
