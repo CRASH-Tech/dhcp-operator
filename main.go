@@ -25,17 +25,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// type State struct {
-// 	Pool   v1alpha1.Pool
-// 	Lease  v1alpha1.Lease
-// 	Leases []v1alpha1.Lease
-// }
-
 var (
-	version = "0.0.1"
-	config  common.Config
-	kClient *kubernetes.Client
-	mutex   sync.Mutex
+	version   = "0.0.1"
+	config    common.Config
+	kClient   *kubernetes.Client
+	namespace string
+	hostname  string
+
+	mutex sync.Mutex
 
 	leaseExpiration = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -98,14 +95,27 @@ func init() {
 	config.KubernetesClient = k8s.NewForConfigOrDie(restConfig)
 
 	prometheus.MustRegister(leaseExpiration)
+
+	namespace = "talos-cloud" //////////////////////////////////////////////////TODO: dddd
+	hostname = os.Getenv("HOSTNAME")
+	/////////////////////////////////PING CHECK!!!!!!!!!!!!!
 }
 
 func main() {
 	log.Infof("Starting dhcp-operator %s", version)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
 
+	leaseLockName := "dhcp-operator"
+	leaseLockNamespace := namespace
+
+	lock := getNewLock(leaseLockName, hostname, leaseLockNamespace)
+	runLeaderElection(lock, ctx, hostname)
+}
+
+func worker() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for {
