@@ -92,6 +92,7 @@ func init() {
 			log.Fatal(err)
 		}
 	}
+
 	config.DynamicClient = dynamic.NewForConfigOrDie(restConfig)
 	config.KubernetesClient = k8s.NewForConfigOrDie(restConfig)
 
@@ -109,6 +110,7 @@ func init() {
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
 
 	leaseLockName := "dhcp-operator"
