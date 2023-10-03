@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"io/ioutil"
 	"net"
 	"os"
 	"sort"
@@ -96,14 +97,16 @@ func init() {
 
 	prometheus.MustRegister(leaseExpiration)
 
-	namespace = "talos-cloud" //////////////////////////////////////////////////TODO: dddd
+	ns, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		log.Panic(err)
+	}
+
+	namespace = string(ns)
 	hostname = os.Getenv("HOSTNAME")
-	/////////////////////////////////PING CHECK!!!!!!!!!!!!!
 }
 
 func main() {
-	log.Infof("Starting dhcp-operator %s", version)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
@@ -116,6 +119,7 @@ func main() {
 }
 
 func worker() {
+	log.Infof("Starting dhcp-operator %s", version)
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for {
