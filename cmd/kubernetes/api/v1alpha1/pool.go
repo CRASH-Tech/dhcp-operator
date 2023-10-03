@@ -26,6 +26,7 @@ type PoolSpec struct {
 	Domain    string   `json:"domain"`
 	Lease     string   `json:"lease"`
 	Filename  string   `json:"filename"`
+	Permanent bool     `json:"permanent"`
 }
 
 func (pool *Pool) GetDNS() []net.IP {
