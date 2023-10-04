@@ -27,11 +27,12 @@ import (
 )
 
 var (
-	version   = "0.0.1"
-	config    common.Config
-	kClient   *kubernetes.Client
-	namespace string
-	hostname  string
+	version       = "0.0.3"
+	config        common.Config
+	kClient       *kubernetes.Client
+	namespace     string
+	hostname      string
+	leaseLockName = "dhcp-operator"
 
 	mutex sync.Mutex
 
@@ -113,10 +114,10 @@ func main() {
 
 	kClient = kubernetes.NewClient(ctx, *config.DynamicClient, *config.KubernetesClient)
 
-	leaseLockName := "dhcp-operator"
-	leaseLockNamespace := namespace
+	mutex.Lock()
+	setLeaderLabel(false)
 
-	lock := getNewLock(leaseLockName, hostname, leaseLockNamespace)
+	lock := getNewLock(leaseLockName, hostname, namespace)
 	runLeaderElection(lock, ctx, hostname)
 }
 
