@@ -65,7 +65,7 @@ spec:
                   type: string
                 filename:
                   type: string
-                permanent:
+                static:
                   type: boolean
       subresources:
         status: {}
@@ -79,5 +79,8 @@ spec:
         - name: end
           type: string
           jsonPath: .spec.end
+        - name: static
+          type: string
+          jsonPath: .spec.static
   conversion:
     strategy: None

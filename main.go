@@ -358,7 +358,7 @@ func makeReply(msg dhcpv4.DHCPv4, lease v1alpha1.Lease, msgType dhcpv4.MessageTy
 		return reply, err
 	}
 
-	lease.Spec.Static = pool.Spec.Permanent
+	lease.Spec.Static = pool.Spec.Static
 	lease, err = kClient.V1alpha1().Lease().Patch(lease)
 	if err != nil {
 		return reply, err
@@ -480,7 +480,7 @@ func newLease(ip net.IP, pool v1alpha1.Pool, msg dhcpv4.DHCPv4) (v1alpha1.Lease,
 	lease.Spec.Ip = ip.String()
 	lease.Spec.Mac = strings.ToUpper(msg.ClientHWAddr.String())
 	lease.Spec.Pool = pool.Metadata.Name
-	lease.Spec.Static = pool.Spec.Permanent
+	lease.Spec.Static = pool.Spec.Static
 	lease.Status.Ends = strconv.FormatInt(time.Now().Add(duration).Unix(), 10)
 
 	lease, err = kClient.V1alpha1().Lease().Create(lease)
