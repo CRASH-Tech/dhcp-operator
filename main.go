@@ -450,7 +450,7 @@ func getLease(msg dhcpv4.DHCPv4) (v1alpha1.Lease, bool, error) {
 	}
 
 	for _, lease := range leases {
-		if lease.Spec.Mac == msg.ClientHWAddr.String() {
+		if strings.EqualFold(lease.Spec.Mac, msg.ClientHWAddr.String()) {
 			return lease, true, nil
 		}
 	}
@@ -478,7 +478,7 @@ func newLease(ip net.IP, pool v1alpha1.Pool, msg dhcpv4.DHCPv4) (v1alpha1.Lease,
 	lease.Metadata.Name = ip.String()
 	lease.Metadata.OwnerReferences = []api.CustomResourceOwnerReference{ownerReference}
 	lease.Spec.Ip = ip.String()
-	lease.Spec.Mac = msg.ClientHWAddr.String()
+	lease.Spec.Mac = strings.ToUpper(msg.ClientHWAddr.String())
 	lease.Spec.Pool = pool.Metadata.Name
 	lease.Spec.Static = pool.Spec.Permanent
 	lease.Status.Ends = strconv.FormatInt(time.Now().Add(duration).Unix(), 10)
