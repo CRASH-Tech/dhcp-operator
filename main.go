@@ -162,7 +162,7 @@ func metrics() {
 		if err != nil {
 			log.Error(err)
 
-			return
+			continue
 		}
 
 		leaseExpiration.WithLabelValues(
@@ -419,8 +419,67 @@ func leaseCleaner() {
 	}
 
 	for _, lease := range leases {
+		if lease.Status.Starts == "" {
+			lease.Status.Starts = strconv.FormatInt(time.Now().Unix(), 10)
+
+			lease, err = kClient.V1alpha1().Lease().UpdateStatus(lease)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
+		}
+
+		if lease.Status.Ends == "" {
+			pool, err := kClient.V1alpha1().Pool().Get(lease.Spec.Pool)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
+
+			duration, err := time.ParseDuration(pool.Spec.Lease)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
+
+			lease.Status.Ends = strconv.FormatInt(time.Now().Add(duration).Unix(), 10)
+
+			lease, err = kClient.V1alpha1().Lease().UpdateStatus(lease)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
+		}
+
 		if lease.Spec.Static {
 			log.Debugf("Skip delete static lease: %s", lease)
+
+			pool, err := kClient.V1alpha1().Pool().Get(lease.Spec.Pool)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
+
+			duration, err := time.ParseDuration(pool.Spec.Lease)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
+
+			lease.Status.Ends = strconv.FormatInt(time.Now().Add(duration).Unix(), 10)
+
+			lease, err = kClient.V1alpha1().Lease().UpdateStatus(lease)
+			if err != nil {
+				log.Error(err)
+
+				continue
+			}
 
 			continue
 		}
@@ -434,7 +493,7 @@ func leaseCleaner() {
 		ends := time.Unix(e, 0).Add(time.Duration(time.Minute * 5))
 
 		if ends.Before(time.Now()) {
-			log.Debug("Delete expired lease: %s", lease)
+			log.Warnf("Delete expired lease: %s", lease)
 			err := kClient.V1alpha1().Lease().Delete(lease)
 			if err != nil {
 				log.Error(err)
