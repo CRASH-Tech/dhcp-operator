@@ -1,0 +1,19 @@
+apiVersion: dhcp.xfix.org/v1alpha1
+kind: Pool
+metadata:
+  name: vlan-123
+spec:
+  subnet: 10.171.123.0/24
+  start: 10.171.123.100
+  end: 10.171.123.150
+  routers: 10.171.123.254
+  broadcast: 10.171.123.255
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+  ntp:
+    - 88.147.254.227
+    - 88.147.254.235
+  domain: xfix.org
+  lease: 1h
+  filename: http://10.171.120.1:9999/pxe/k-test-worker

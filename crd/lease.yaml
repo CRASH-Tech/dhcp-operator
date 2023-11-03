@@ -1,0 +1,77 @@
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1
+metadata:
+  name: lease.dhcp.xfix.org
+  labels:
+    app: dhcp-operator
+spec:
+  group: dhcp.xfix.org
+  names:
+    plural: lease
+    singular: leases
+    kind: Lease
+    listKind: LeaseList
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Server is the Schema for the servers API.
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: ServerSpec defines the desired state of Server.
+              type: object
+              required:
+                - ip
+                - mac
+                - pool
+              properties:
+                ip:
+                  type: string
+                mac:
+                  type: string
+                static:
+                  type: boolean
+                pool:
+                  type: string
+            status:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                starts:
+                  type: string
+                ends:
+                  type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: ip
+          type: string
+          jsonPath: .spec.ip
+        - name: mac
+          type: string
+          jsonPath: .spec.mac
+        - name: static
+          type: boolean
+          jsonPath: .spec.static
+        - name: hostname
+          type: string
+          jsonPath: .status.hostname
+        - name: starts
+          type: string
+          jsonPath: .status.starts
+        - name: ends
+          type: string
+          jsonPath: .status.ends
+  conversion:
+    strategy: None

@@ -1,0 +1,5 @@
+dhcpPort: 67
+pxePort: 9999
+log:
+  level: debug
+  format: text
